@@ -4,7 +4,7 @@ from typing import Any
 from openai import OpenAI
 
 client = OpenAI(
-    api_key="xai-J8jdd1RZRTlRhAEr315lwvI0kyW97q75UsGyItSxk9zWDxUjvjQNlu7eJ7Xz7Cfhcc1gbqxGE12U3aqZ",
+    api_key="",
     base_url="https://api.x.ai/v1",
 )
 
