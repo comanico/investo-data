@@ -44,6 +44,11 @@ def compute_ratios_from_structured(data: dict) -> pd.DataFrame:
             tax_rate = min(abs(tax) / abs(opinc), 0.5)
         nopat = opinc * (1 - tax_rate) if opinc is not None else None
 
+        pretax = (ni + tax) if (ni is not None and tax is not None) else ni
+        assets = v(bal, "total_assets", y) or (
+            (tliab + eq) if (tliab is not None and eq is not None) else None
+        )
+
         r = {}
         r["ROE"] = ni / avg_eq if (ni is not None and avg_eq) else None
         r["Gross Profit Margin"] = (rev - cos) / rev if (rev and cos is not None) else None
@@ -69,6 +74,12 @@ def compute_ratios_from_structured(data: dict) -> pd.DataFrame:
             r["ROE"] * (1 - r["Dividend Payout Ratio"])
             if (r["ROE"] is not None and r["Dividend Payout Ratio"] is not None) else None
         )
+        r["DuPont Tax Burden"] = ni / pretax if pretax else None
+        r["DuPont Interest Burden"] = pretax / opinc if opinc else None
+        r["DuPont Operating Margin"] = opinc / rev if rev else None
+        r["DuPont Asset Turnover"] = rev / assets if assets else None
+        r["DuPont Financial Leverage"] = assets / eq if eq else None
+        r["DuPont ROE Check"] = ni / eq if eq else None
         rows[y] = r
 
     df = pd.DataFrame(rows).T   

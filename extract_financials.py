@@ -3,6 +3,7 @@ import json
 import pandas as pd
 import pdf_inspector
 from pathlib import Path
+from dupont import compute_dupont_ratios_from_structured
 from grok import extract_financials_with_grok
 from ratios import compute_ratios_from_structured
 
@@ -44,6 +45,9 @@ def main(pdf_path):
 
     ratios_df = compute_ratios_from_structured(structured)
     ratios_df.to_csv(f"{out_dir}/ratios.csv")
+
+    ratios_df = compute_dupont_ratios_from_structured(structured)
+    ratios_df.to_csv(f"{out_dir}/dupont.csv")
 
     for name, df in dfs.items():
         print(f"\n=== {name.upper()} ===")
