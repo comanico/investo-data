@@ -1,10 +1,12 @@
+from dotenv import load_dotenv
 import os
 import json
 from typing import Any
 from openai import OpenAI
 
+load_dotenv()
 client = OpenAI(
-    api_key="",
+    api_key=os.getenv("GROK_API"),
     base_url="https://api.x.ai/v1",
 )
 
