@@ -13,14 +13,15 @@ client = OpenAI(
 MODEL = "grok-4"
 
 FINANCIAL_EXTRACTOR_SYSTEM = """
-You are an expert at reading SEC 10-K filings and extracting the exact numbers needed for financial ratio analysis.
+You are an expert at reading SEC 10-K filings and extracting the exact numbers needed for financial ratio analysis and DCF valuation.
 
 You receive Markdown from the table-containing pages of a 10-K.
-Extract ONLY the canonical fields listed below. 
+Extract ONLY the canonical fields listed below.
 Use the company's own labels but map them to these exact keys.
 If a value is not clearly present, put null.
 Convert all numbers to plain floats (parentheses = negative). Strip $, commas, and unit notes.
 Return years as integers and values in the same unit the company uses (usually millions).
+Use string keys for years in nested objects, e.g. "2024".
 
 Return ONLY valid JSON in this schema:
 
@@ -52,37 +53,55 @@ Return ONLY valid JSON in this schema:
   },
   "cash_flow": {
     "cfo": {},
+    "depreciation_amortization": {},
+    "capex": {},
+    "dividends_paid": {},
+    "proceeds_from_debt": {},
+    "repayments_of_debt": {},
+    "net_debt_issuance": {},
     "interest_paid": {},
     "taxes_paid": {}
   }
 }
 
-Mapping guidance (what to look for in the 10-K):
+Mapping guidance:
 
 INCOME STATEMENT
 - revenue                  ← Total revenues, Net sales, Total net sales, Revenue
 - cost_of_sales            ← Cost of sales, Cost of goods sold, Cost of products sold
-- operating_income         ← Operating income/(loss), Operating profit, Income from operations
-- interest_expense         ← Interest expense (Company, excluding Ford Credit if broken out)
+- operating_income         ← Operating income/(loss), Income from operations
+- interest_expense         ← Interest expense (prefer Company excluding finance subsidiary if broken out)
 - income_tax_expense       ← Provision for/(Benefit from) income taxes
-- net_income               ← Net income/(loss) attributable to [Company], Net income attributable to shareholders
-- dividends_paid           ← Dividends paid (often in cash-flow statement or equity statement)
+- net_income               ← Net income/(loss) attributable to [parent], Net income attributable to shareholders
+- dividends_paid           ← Common dividends declared (if only on equity/CF statement, still fill here when found)
 
 BALANCE SHEET
 - cash                     ← Cash and cash equivalents
 - marketable_securities    ← Marketable securities, Short-term investments
-- receivables              ← Trade and other receivables, Accounts receivable, Finance receivables (trade portion)
+- receivables              ← Trade and other receivables, Accounts receivable
 - current_assets           ← Total current assets
 - current_liabilities      ← Total current liabilities
 - short_term_debt          ← Short-term debt, Current portion of long-term debt, Notes payable
-- long_term_debt           ← Long-term debt, Long-term borrowings
-- total_debt               ← Sum of short-term + long-term debt if not given directly; also look for "Total debt"
+- long_term_debt           ← Long-term debt
+- total_debt               ← Total debt, or short-term + long-term debt
 - total_liabilities        ← Total liabilities
-- equity                   ← Total equity attributable to [Company], Total stockholders' equity, Total equity
+- equity                   ← Total equity attributable to parent / stockholders' equity
 
-CASH FLOW
+CASH FLOW (critical for valuation)
 - cfo                      ← Net cash provided by/(used in) operating activities
-- taxes_paid               ← Income taxes paid (supplemental disclosure)
+- depreciation_amortization← Depreciation and amortization, Depreciation and tooling amortization
+- capex                    ← Capital expenditures, Purchase of property and equipment, Additions to property/equipment
+                             (usually negative or shown as use of cash; store as signed number, negative = outflow)
+- dividends_paid           ← Payments of dividends, Cash dividends paid, Dividends to shareholders
+                             (usually negative; store signed)
+- proceeds_from_debt       ← Proceeds from issuance of long-term debt, Proceeds from debt
+- repayments_of_debt       ← Principal payments on debt, Payments of long-term debt, Repayments of debt
+- net_debt_issuance        ← proceeds_from_debt + repayments_of_debt if both present (repayments negative),
+                             or a single net line if the company reports one
+- interest_paid            ← Cash paid for interest (supplemental)
+- taxes_paid               ← Cash paid for income taxes (supplemental)
+
+Prefer consolidated figures. If automotive vs financial-services (e.g. Ford Credit) are split, prefer totals that match the consolidated statements unless a field explicitly asks for Company excluding finance subsidiary.
 """
 
 def extract_financials_with_grok(markdown: str, model: str = MODEL) -> dict[str, Any]:
